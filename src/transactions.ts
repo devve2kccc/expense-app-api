@@ -33,15 +33,42 @@ const UpdateSchema = z.object({
     categoryId: z.string().optional()
 })
 
-app.get("/", async (c) => {
-    const transactionsList = await prisma.transactions.findMany({})
+app.get("/", zValidator(
+    "query",
+    z.object({
+        from: z.string().optional(),
+        to: z.string().optional(),
+        accountId: z.string().optional(),
+        categoryId: z.string().optional()
+    })), async (c) => {
+        const { from, to, accountId, categoryId } = c.req.valid("query");
 
-    const transactions = transactionsList.map((transaction) => ({
-        ...transaction,
-        amount: formatCurrency(convertAmountFromMiliunits(transaction.amount))
-    }))
-    return c.json({ transactions })
-})
+        const where: any = {};
+
+        if (from) {
+            where.date = { ...where.date, gte: parseISO(from) };
+        }
+
+        if (to) {
+            where.date = { ...where.date, lte: parseISO(to) };
+        }
+
+        if (accountId) {
+            where.accountId = accountId;
+        }
+
+        if (categoryId) {
+            where.categoryId = categoryId;
+        }
+
+        const transactionsList = await prisma.transactions.findMany({ where });
+
+        const transactions = transactionsList.map((transaction) => ({
+            ...transaction,
+            amount: formatCurrency(convertAmountFromMiliunits(transaction.amount))
+        }))
+        return c.json({ transactions })
+    })
 
 app.post("/", zValidator("json", TransactionsSchema), async (c) => {
     const values = c.req.valid("json")
