@@ -18,8 +18,10 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.4.0",
     "@types/node": "^20.11.17",
     "prisma": "^5.22.0",
+    "prisma-erd-generator": "^1.11.2",
     "tsx": "^4.7.1"
   }
 }

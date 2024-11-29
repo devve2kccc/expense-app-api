@@ -18,27 +18,20 @@ const app = new Hono<{ Variables: Variables }>().basePath('/api')
 
 app.use(logger())
 
-app.use('/accounts/*', (c, next) => {
-  const jwtMiddleware = jwt({
-    secret: process.env.JWT_SECRET!,
-  })
-  return jwtMiddleware(c, next)
-})
+app.use('/accounts/*', jwt({
+  secret: process.env.JWT_SECRET!,
+  cookie: 'token',
+}))
 
-app.use('/categories/*', (c, next) => {
-  const jwtMiddleware = jwt({
-    secret: process.env.JWT_SECRET!,
-  })
-  return jwtMiddleware(c, next)
-})
+app.use('/categories/*', jwt({
+  secret: process.env.JWT_SECRET!,
+  cookie: 'token',
+}))
 
-
-app.use('/transactions/*', (c, next) => {
-  const jwtMiddleware = jwt({
-    secret: process.env.JWT_SECRET!,
-  })
-  return jwtMiddleware(c, next)
-})
+app.use('/transactions/*', jwt({
+  secret: process.env.JWT_SECRET!,
+  cookie: 'token',
+}))
 
 app.route("/auth", Auth).route("/accounts", Accounts).route("/categories", Categories).route("/transactions", Transactions)
 

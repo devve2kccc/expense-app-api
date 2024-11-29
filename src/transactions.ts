@@ -41,9 +41,16 @@ app.get("/", zValidator(
         accountId: z.string().optional(),
         categoryId: z.string().optional()
     })), async (c) => {
+        const user = c.get("jwtPayload")
         const { from, to, accountId, categoryId } = c.req.valid("query");
 
-        const where: any = {};
+        console.log(user);
+
+        const where: any = {
+            accounts: {
+                userId: user.id
+            }
+        };
 
         if (from) {
             where.date = { ...where.date, gte: parseISO(from) };
@@ -61,29 +68,47 @@ app.get("/", zValidator(
             where.categoryId = categoryId;
         }
 
-        const transactionsList = await prisma.transactions.findMany({ where });
+        const transactionsList = await prisma.transactions.findMany({
+            where: where,
+            include: {
+                accounts: true,
+                categories: true
+            }
+        });
 
         const transactions = transactionsList.map((transaction) => ({
-            ...transaction,
-            amount: formatCurrency(convertAmountFromMiliunits(transaction.amount))
+            id: transaction.id,
+            date: transaction.date,
+            category: transaction.categories?.name,
+            categoryId: transaction.categoryId,
+            payee: transaction.payee,
+            amount: formatCurrency(convertAmountFromMiliunits(transaction.amount)),
+            notes: transaction.notes,
+            account: transaction.accounts.name,
+            accountId: transaction.accountId
         }))
         return c.json({ transactions })
     })
 
 app.post("/", zValidator("json", TransactionsSchema), async (c) => {
+    const user = c.get("jwtPayload")
     const values = c.req.valid("json")
 
-    const accountExist = await prisma.accounts.findUnique({ where: { id: values.accountId } })
+    const accountExist = await prisma.accounts.findFirst({
+        where: { id: values.accountId, userId: user.id }
+    })
 
     if (!accountExist) {
-        return c.json({ error: "Provide an valid account!" }, 404)
+        return c.json({ error: "Provide a valid account!" }, 404)
     }
 
     if (values.categoryId) {
-        const categoryExist = await prisma.categories.findUnique({ where: { id: values.categoryId } })
+        const categoryExist = await prisma.categories.findFirst({
+            where: { id: values.categoryId, userId: user.id }
+        })
 
         if (!categoryExist) {
-            return c.json({ error: "Provide an valid category!" }, 404)
+            return c.json({ error: "Provide a valid category!" }, 404)
         }
     }
     const transaction = await prisma.transactions.create({
@@ -103,6 +128,7 @@ app.post("/", zValidator("json", TransactionsSchema), async (c) => {
 })
 
 app.put("/:id", zValidator("param", z.object({ id: z.string() })), zValidator("json", UpdateSchema), async (c) => {
+    const user = c.get("jwtPayload")
     const { id } = c.req.valid("param")
     const values = c.req.valid("json")
 
@@ -111,6 +137,14 @@ app.put("/:id", zValidator("param", z.object({ id: z.string() })), zValidator("j
     }
 
     try {
+        const transactionExist = await prisma.transactions.findFirst({
+            where: { id: id, accounts: { userId: user.id } }
+        })
+
+        if (!transactionExist) {
+            return c.json({ error: "Transaction not found or you are not authorized to update this account." }, 404);
+        }
+
         const data = { ...values }
 
         if (values.amount !== undefined) {
@@ -140,6 +174,7 @@ app.put("/:id", zValidator("param", z.object({ id: z.string() })), zValidator("j
 app.delete("/:id", zValidator("param", z.object({
     id: z.string()
 })), async (c) => {
+    const user = c.get("jwtPayload")
     const { id } = c.req.valid("param")
 
     if (!id) {
@@ -147,6 +182,14 @@ app.delete("/:id", zValidator("param", z.object({
     }
 
     try {
+        const transactionExist = await prisma.transactions.findFirst({
+            where: { id: id, accounts: { userId: user.id } }
+        })
+
+        if (!transactionExist) {
+            return c.json({ error: "Transaction not found or you are not authorized to delete this account." }, 404);
+        }
+
         const transaction = await prisma.transactions.delete({
             where: {
                 id: id
@@ -156,7 +199,7 @@ app.delete("/:id", zValidator("param", z.object({
     } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError) {
             if (e.code === 'P2025') {
-                return c.json({ error: "Transaction not found or you are not authorized to update this account." }, 404);
+                return c.json({ error: "Transaction not found or you are not authorized to delete this account." }, 404);
             }
         }
     }

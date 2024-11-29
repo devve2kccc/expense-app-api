@@ -13,6 +13,8 @@ const CategorySchema = z.object({
 
 app.get("/", async (c) => {
     const user = c.get("jwtPayload")
+    console.log(user);
+
 
     const categories = await prisma.categories.findMany({
         where: {
@@ -68,6 +70,7 @@ app.put("/:id", zValidator("param", z.object({ id: z.string() })), zValidator("j
 app.delete("/:id", zValidator("param", z.object({
     id: z.string()
 })), async (c) => {
+    const user = c.get("jwtPayload")
     const { id } = c.req.valid("param")
 
     if (!id) {
@@ -75,16 +78,27 @@ app.delete("/:id", zValidator("param", z.object({
     }
 
     try {
-        const category = await prisma.categories.delete({
+        const category = await prisma.categories.findUnique({
             where: {
                 id: id
             }
         })
+
+        if (!category || category.userId !== user.id) {
+            return c.json({ error: "Category not found or you are not authorized to delete this category." }, 404);
+        }
+
+        await prisma.categories.delete({
+            where: {
+                id: id
+            }
+        })
+
         return c.json({ category });
     } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError) {
             if (e.code === 'P2025') {
-                return c.json({ error: "Account not found or you are not authorized to update this account." }, 404);
+                return c.json({ error: "Category not found or you are not authorized to delete this category." }, 404);
             }
         }
     }

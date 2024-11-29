@@ -5,6 +5,7 @@ import { z } from 'zod'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
+import { setCookie } from 'hono/cookie'
 
 const app = new Hono()
 const prisma = new PrismaClient()
@@ -66,6 +67,7 @@ app.post("/login", zValidator("json", LoginSchema), async (c) => {
         const token = jwt.sign(tokenPayload, process.env.JWT_SECRET!, {
             expiresIn: "1d"
         });
+        setCookie(c, 'token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
 
         return c.json({ token });
     } catch (error) {

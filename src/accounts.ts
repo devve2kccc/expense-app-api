@@ -46,20 +46,25 @@ app.put("/:id", zValidator("param", z.object({ id: z.string() })), zValidator("j
         return c.json({ error: "Missing Id" }, 400);
     }
 
+    const account = await prisma.accounts.findUnique({
+        where: { id }
+    })
+
+    if (!account || account.userId !== user.id) {
+        return c.json({ error: "Account not found or you are not authorized to update this account." }, 404);
+    }
+
     try {
-        const account = await prisma.accounts.update({
-            where: {
-                id: id,
-                userId: user.id
-            },
+        const updatedAccount = await prisma.accounts.update({
+            where: { id },
             data: { name }
         })
 
-        return c.json({ account });
+        return c.json({ updatedAccount });
     } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError) {
             if (e.code === 'P2025') {
-                return c.json({ error: "Category not found or you are not authorized to update this account." }, 404);
+                return c.json({ error: "Account not found or you are not authorized to update this account." }, 404);
             }
         }
     }
@@ -68,24 +73,30 @@ app.put("/:id", zValidator("param", z.object({ id: z.string() })), zValidator("j
 app.delete("/:id", zValidator("param", z.object({
     id: z.string()
 })), async (c) => {
+    const user = c.get("jwtPayload")
     const { id } = c.req.valid("param")
 
     if (!id) {
         return c.json({ error: "Missing Id" }, 400);
     }
 
+    const account = await prisma.accounts.findUnique({
+        where: { id }
+    })
+
+    if (!account || account.userId !== user.id) {
+        return c.json({ error: "Account not found or you are not authorized to delete this account." }, 404);
+    }
 
     try {
-        const account = await prisma.accounts.delete({
-            where: {
-                id: id
-            }
+        const deletedAccount = await prisma.accounts.delete({
+            where: { id }
         })
-        return c.json({ account });
+        return c.json({ deletedAccount });
     } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError) {
             if (e.code === 'P2025') {
-                return c.json({ error: "Category not found or you are not authorized to update this account." }, 404);
+                return c.json({ error: "Account not found or you are not authorized to delete this account." }, 404);
             }
         }
     }
